@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { signIn } from '../services/auth';
 import { useTheme } from '../utils/ThemeContext';
 import { fadeIn, slideUp } from '../utils/animations';
+import { Toast } from '../utils/Toast';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const { theme, isDarkMode, toggleTheme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -22,16 +24,36 @@ export default function LoginScreen({ navigation }) {
   }, []);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill all fields');
+    if (!email.trim() || !password.trim()) {
+      setToast({ visible: true, message: 'Please enter both email and password', type: 'error' });
+      return;
+    }
+
+    if (!email.includes('@')) {
+      setToast({ visible: true, message: 'Please enter a valid email address', type: 'error' });
       return;
     }
 
     setLoading(true);
     try {
-      await signIn(email, password);
+      await signIn(email.trim(), password);
+      setToast({ visible: true, message: 'Login successful!', type: 'success' });
     } catch (error) {
-      Alert.alert('Login Failed', error.message);
+      console.error('Login error:', error);
+      
+      let errorMessage = 'Unable to sign in. Please try again.';
+      
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password';
+      } else if (error.message?.includes('Network request failed')) {
+        errorMessage = 'Network error. Check your internet connection';
+      } else if (error.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please verify your email address';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setToast({ visible: true, message: errorMessage, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -96,6 +118,13 @@ export default function LoginScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </Animated.View>
+      
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={() => setToast({ ...toast, visible: false })}
+      />
     </LinearGradient>
   );
 }

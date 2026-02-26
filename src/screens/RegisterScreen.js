@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { signUp, signIn } from '../services/auth';
 import { useTheme } from '../utils/ThemeContext';
 import { fadeIn, slideUp } from '../utils/animations';
+import { Toast } from '../utils/Toast';
 
 export default function RegisterScreen({ navigation }) {
   const [fullName, setFullName] = useState('');
@@ -12,6 +13,7 @@ export default function RegisterScreen({ navigation }) {
   const [role, setRole] = useState('driver');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const { theme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -24,18 +26,49 @@ export default function RegisterScreen({ navigation }) {
   }, []);
 
   const handleRegister = async () => {
-    if (!fullName || !email || !password) {
-      Alert.alert('Error', 'Please fill all fields');
+    if (!fullName.trim() || !email.trim() || !password.trim()) {
+      setToast({ visible: true, message: 'Please fill in all fields', type: 'error' });
+      return;
+    }
+
+    if (!email.includes('@')) {
+      setToast({ visible: true, message: 'Please enter a valid email address', type: 'error' });
+      return;
+    }
+
+    if (password.length < 6) {
+      setToast({ visible: true, message: 'Password must be at least 6 characters', type: 'error' });
       return;
     }
 
     setLoading(true);
     try {
-      await signUp(email, password, fullName, role);
-      Alert.alert('Success', 'Account created! Logging you in...');
-      await signIn(email, password);
+      await signUp(email.trim(), password, fullName.trim(), role);
+      setToast({ visible: true, message: 'Account created! Logging you in...', type: 'success' });
+      setTimeout(async () => {
+        try {
+          await signIn(email.trim(), password);
+        } catch (loginError) {
+          setToast({ visible: true, message: 'Please login with your credentials', type: 'info' });
+          setTimeout(() => navigation.navigate('Login'), 2000);
+        }
+      }, 1500);
     } catch (error) {
-      Alert.alert('Registration Failed', error.message);
+      console.error('Registration error:', error);
+      
+      let errorMessage = 'Unable to create account';
+      
+      if (error.message?.includes('User already registered')) {
+        errorMessage = 'Email already registered. Please login';
+      } else if (error.message?.includes('Network request failed')) {
+        errorMessage = 'Network error. Check your internet connection';
+      } else if (error.message?.includes('Password should be')) {
+        errorMessage = 'Password must be at least 6 characters';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setToast({ visible: true, message: errorMessage, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -119,6 +152,13 @@ export default function RegisterScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </Animated.View>
+      
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={() => setToast({ ...toast, visible: false })}
+      />
     </LinearGradient>
   );
 }

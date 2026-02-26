@@ -58,45 +58,27 @@ export default function DriverDashboard({ navigation }) {
 
   const acceptOrder = async (orderId) => {
     try {
-      // Find the order being accepted
       const orderToAccept = orders.find(o => o.id === orderId);
-      
-      // Check for orders along the route
       const recommendations = await findOrdersAlongRoute(orderToAccept, user.id);
       
       if (recommendations.length > 0) {
-        // Show both return trips and on-the-way orders (up to 3 total)
         const toShow = recommendations.slice(0, 3);
-        const hasReturnTrip = toShow.some(r => r.isReturnTrip);
-        
-        const message = toShow.map((rec, i) => {
-          const type = rec.isReturnTrip ? '🔄 Return Trip' : '📍 On-the-Way';
-          const detourText = rec.isReturnTrip 
-            ? 'Perfect return trip!' 
-            : `Only +${rec.totalDetour}km detour`;
-          
-          return `${i + 1}. ${type}\n` +
-                 `   ${rec.order.drop_address.substring(0, 40)}...\n` +
-                 `   ${detourText} • Save ${rec.savings.percentSaved}%`;
-        }).join('\n\n');
-        
-        const title = hasReturnTrip 
-          ? '🔄 Perfect Return Trip!' 
-          : '💡 Smart Recommendation';
+        const allOrders = [orderToAccept, ...toShow.map(r => r.order)];
         
         setAlertConfig({
           visible: true,
-          title: title,
-          message: `You can also deliver these orders along your route:\n\n${message}`,
+          title: '💡 Smart Route Recommendations',
+          message: `Accept multiple orders along your route to maximize efficiency!`,
+          orders: allOrders,
           buttons: [
             { 
-              text: 'Accept All', 
+              text: `Accept All (${allOrders.length})`, 
               onPress: async () => {
-                await acceptMultipleOrders([orderId, ...toShow.map(r => r.order.id)]);
+                await acceptMultipleOrders(allOrders.map(o => o.id));
               }
             },
             { 
-              text: 'Just This One', 
+              text: 'Just Main Order', 
               style: 'cancel',
               onPress: async () => {
                 await acceptSingleOrder(orderId);
@@ -105,8 +87,24 @@ export default function DriverDashboard({ navigation }) {
           ]
         });
       } else {
-        // No recommendations, accept directly
-        await acceptSingleOrder(orderId);
+        setAlertConfig({
+          visible: true,
+          title: '📦 Accept Order?',
+          message: null,
+          orders: [orderToAccept],
+          buttons: [
+            { 
+              text: 'Accept', 
+              onPress: async () => {
+                await acceptSingleOrder(orderId);
+              }
+            },
+            { 
+              text: 'Cancel', 
+              style: 'cancel'
+            }
+          ]
+        });
       }
     } catch (error) {
       console.error('Failed to accept order:', error);
@@ -159,24 +157,56 @@ export default function DriverDashboard({ navigation }) {
           </View>
         )}
         <View style={[styles.statusBadge, styles[item.status]]}>
-          <Text style={[styles.statusText, { color: theme.white }]}>{item.status}</Text>
+          <Text style={[styles.statusText, { color: theme.white }]}>{item.status.toUpperCase()}</Text>
         </View>
       </View>
-      <View style={styles.addressRow}>
-        <Text style={styles.addressIcon}>📍</Text>
-        <Text style={[styles.address, { color: theme.textSecondary }]} numberOfLines={1}>{item.pickup_address}</Text>
+      
+      <View style={styles.detailsSection}>
+        <View style={styles.addressContainer}>
+          <Text style={[styles.addressLabel, { color: theme.textSecondary }]}>📍 Pickup</Text>
+          <Text style={[styles.addressText, { color: theme.textPrimary }]} numberOfLines={2}>{item.pickup_address}</Text>
+        </View>
+        
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+        
+        <View style={styles.addressContainer}>
+          <Text style={[styles.addressLabel, { color: theme.textSecondary }]}>🎯 Drop</Text>
+          <Text style={[styles.addressText, { color: theme.textPrimary }]} numberOfLines={2}>{item.drop_address}</Text>
+        </View>
       </View>
-      <View style={styles.addressRow}>
-        <Text style={styles.addressIcon}>🎯</Text>
-        <Text style={[styles.address, { color: theme.textSecondary }]} numberOfLines={1}>{item.drop_address}</Text>
+      
+      <View style={styles.metaRow}>
+        <View style={styles.metaItem}>
+          <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>📏 Distance</Text>
+          <Text style={[styles.metaValue, { color: theme.primaryBlue }]}>{item.planned_distance} km</Text>
+        </View>
+        {item.vehicle_type && (
+          <View style={styles.metaItem}>
+            <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>🚗 Vehicle</Text>
+            <Text style={[styles.metaValue, { color: theme.textPrimary }]}>{item.vehicle_type}</Text>
+          </View>
+        )}
+        <View style={styles.metaItem}>
+          <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>📅 Created</Text>
+          <Text style={[styles.metaValue, { color: theme.textPrimary }]}>{new Date(item.created_at).toLocaleDateString()}</Text>
+        </View>
       </View>
-      <Text style={[styles.distance, { color: theme.primaryBlue }]}>{item.planned_distance} km</Text>
+      
       {item.status === 'pending' && (
         <TouchableOpacity 
           style={[styles.acceptButton, { backgroundColor: theme.secondaryGreen }]}
           onPress={() => acceptOrder(item.id)}
         >
           <Text style={[styles.acceptButtonText, { color: theme.white }]}>Accept Order</Text>
+        </TouchableOpacity>
+      )}
+      
+      {item.status === 'assigned' && (
+        <TouchableOpacity 
+          style={[styles.startButton, { backgroundColor: theme.primaryBlue }]}
+          onPress={() => navigation.navigate('OrderDetails', { order: item })}
+        >
+          <Text style={[styles.startButtonText, { color: theme.white }]}>View Details →</Text>
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -249,6 +279,7 @@ export default function DriverDashboard({ navigation }) {
         visible={alertConfig.visible}
         title={alertConfig.title}
         message={alertConfig.message}
+        orders={alertConfig.orders}
         buttons={alertConfig.buttons}
         onDismiss={() => setAlertConfig({ ...alertConfig, visible: false })}
       />
@@ -329,14 +360,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   orderCard: {
-    padding: 16,
+    padding: 18,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   orderHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
     gap: 8,
   },
   sequenceBadge: {
@@ -357,7 +393,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     fontWeight: '700',
-    textTransform: 'uppercase',
   },
   pending: {
     backgroundColor: '#F59E0B',
@@ -368,32 +403,62 @@ const styles = StyleSheet.create({
   delivered: {
     backgroundColor: '#10B981',
   },
-  addressRow: {
+  detailsSection: {
+    marginBottom: 12,
+  },
+  addressContainer: {
+    marginBottom: 8,
+  },
+  addressLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  addressText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  divider: {
+    height: 1,
+    marginVertical: 8,
+  },
+  metaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
+    justifyContent: 'space-between',
+    marginTop: 8,
+    marginBottom: 12,
   },
-  addressIcon: {
-    fontSize: 14,
-    marginRight: 8,
-  },
-  address: {
-    fontSize: 14,
+  metaItem: {
     flex: 1,
   },
-  distance: {
-    fontSize: 14,
+  metaLabel: {
+    fontSize: 11,
+    marginBottom: 2,
+  },
+  metaValue: {
+    fontSize: 13,
     fontWeight: '600',
-    marginTop: 8,
   },
   acceptButton: {
-    marginTop: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: 'center',
   },
   acceptButtonText: {
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  startButton: {
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  startButtonText: {
+    fontSize: 15,
     fontWeight: '700',
   },
   emptyText: {
