@@ -8,6 +8,7 @@ import { supabase } from '../services/supabase';
 import { Toast } from '../utils/Toast';
 import { findOrdersAlongRoute } from '../services/enRouteMatching';
 import { CustomAlert } from '../utils/CustomAlert';
+import { subscribeToDriverOrders, requestNotificationPermissions, unsubscribeFromNotifications } from '../services/notifications';
 
 export default function DriverDashboard({ navigation }) {
   const [orders, setOrders] = useState([]);
@@ -17,6 +18,7 @@ export default function DriverDashboard({ navigation }) {
   const { theme } = useTheme();
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', buttons: [] });
+  const [notificationChannel, setNotificationChannel] = useState(null);
 
   // Get current assigned order ID for location tracking
   const currentOrderId = orders.find(o => o.status === 'assigned')?.id || null;
@@ -25,7 +27,26 @@ export default function DriverDashboard({ navigation }) {
 
   useEffect(() => {
     loadUser();
+    requestNotificationPermissions();
+    
+    return () => {
+      if (notificationChannel) {
+        unsubscribeFromNotifications(notificationChannel);
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      const channel = subscribeToDriverOrders(user.id, (notification) => {
+        if (notification.type === 'new_order') {
+          loadOrders(user.id);
+          setToast({ visible: true, message: 'New order assigned!', type: 'success' });
+        }
+      });
+      setNotificationChannel(channel);
+    }
+  }, [user]);
 
   const loadUser = async () => {
     const currentUser = await getCurrentUser();
