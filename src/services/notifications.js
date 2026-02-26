@@ -1,44 +1,62 @@
 import { supabase } from './supabase';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-// Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+let Notifications = null;
+try {
+  Notifications = require('expo-notifications');
+  // Configure notification behavior
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+} catch (error) {
+  console.log('Notifications module not available, running without notifications');
+}
 
 // Request notification permissions
 export const requestNotificationPermissions = async () => {
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-  
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
+  if (!Notifications) return false;
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    
+    return finalStatus === 'granted';
+  } catch (error) {
+    console.log('Permission request failed:', error);
+    return false;
   }
-  
-  return finalStatus === 'granted';
 };
 
 // Show local notification
 export const showLocalNotification = async (title, body, data = {}) => {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title,
-      body,
-      data,
-      sound: true,
-    },
-    trigger: null, // Show immediately
-  });
+  if (!Notifications) return;
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        data,
+        sound: true,
+      },
+      trigger: null, // Show immediately
+    });
+  } catch (error) {
+    console.log('Failed to show notification:', error);
+  }
 };
 
 // Subscribe to order changes for drivers
 export const subscribeToDriverOrders = (driverId, onNotification) => {
+  console.log('Subscribing to driver orders for:', driverId);
+  
   const channel = supabase
     .channel('driver-orders')
     .on(
@@ -50,6 +68,7 @@ export const subscribeToDriverOrders = (driverId, onNotification) => {
         filter: `driver_id=eq.${driverId}`,
       },
       (payload) => {
+        console.log('New order INSERT detected:', payload);
         showLocalNotification(
           '📦 New Order Assigned!',
           `You have a new delivery order. Distance: ${payload.new.planned_distance}km`,
@@ -67,6 +86,7 @@ export const subscribeToDriverOrders = (driverId, onNotification) => {
         filter: `driver_id=eq.${driverId}`,
       },
       (payload) => {
+        console.log('Order UPDATE detected:', payload);
         if (payload.new.status === 'assigned' && payload.old.status === 'pending') {
           showLocalNotification(
             '✅ Order Confirmed',
@@ -77,15 +97,17 @@ export const subscribeToDriverOrders = (driverId, onNotification) => {
         onNotification?.({ type: 'order_updated', data: payload.new });
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log('Subscription status:', status);
+    });
 
   return channel;
 };
 
 // Subscribe to order changes for admins
-export const subscribeToAdminOrders = (onNotification) => {
+export const subscribeToAdminOrders = (ordersMapRef) => {
   const channel = supabase
-    .channel('admin-orders')
+    .channel('admin-orders-realtime')
     .on(
       'postgres_changes',
       {
@@ -94,25 +116,26 @@ export const subscribeToAdminOrders = (onNotification) => {
         table: 'orders',
       },
       (payload) => {
-        // Order accepted by driver
-        if (payload.new.status === 'assigned' && payload.old.status === 'pending') {
+        const oldStatus = ordersMapRef.current[payload.new.id];
+        const newStatus = payload.new.status;
+        
+        if (oldStatus === 'pending' && newStatus === 'assigned') {
           showLocalNotification(
             '✅ Order Accepted',
-            `Driver accepted order #${payload.new.id.substring(0, 8)}`,
+            'Driver has accepted a delivery order',
             { orderId: payload.new.id, type: 'order_accepted' }
           );
-          onNotification?.({ type: 'order_accepted', data: payload.new });
         }
         
-        // Order completed
-        if (payload.new.status === 'delivered' && payload.old.status === 'assigned') {
+        if (oldStatus === 'assigned' && newStatus === 'delivered') {
           showLocalNotification(
             '🎉 Order Completed!',
-            `Order #${payload.new.id.substring(0, 8)} has been delivered successfully`,
+            'A delivery has been completed successfully',
             { orderId: payload.new.id, type: 'order_completed' }
           );
-          onNotification?.({ type: 'order_completed', data: payload.new });
         }
+        
+        ordersMapRef.current[payload.new.id] = newStatus;
       }
     )
     .subscribe();

@@ -50,6 +50,14 @@
         {
           "photosPermission": "TrackSure needs access to your photos to capture delivery proof."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#1E3A8A",
+          "sounds": ["./assets/notification-sound.wav"]
+        }
       ]
     ]
   }

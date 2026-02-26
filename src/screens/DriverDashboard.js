@@ -38,13 +38,16 @@ export default function DriverDashboard({ navigation }) {
 
   useEffect(() => {
     if (user?.id) {
+      console.log('Setting up notifications for driver:', user.id);
       const channel = subscribeToDriverOrders(user.id, (notification) => {
+        console.log('Notification received:', notification);
         if (notification.type === 'new_order') {
           loadOrders(user.id);
           setToast({ visible: true, message: 'New order assigned!', type: 'success' });
         }
       });
       setNotificationChannel(channel);
+      console.log('Notification channel created');
     }
   }, [user]);
 

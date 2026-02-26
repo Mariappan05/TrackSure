@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator }
 import { getOrders } from '../services/orders';
 import { signOut } from '../services/auth';
 import { useTheme } from '../utils/ThemeContext';
+import { Toast } from '../utils/Toast';
+import { subscribeToAdminOrders, requestNotificationPermissions, unsubscribeFromNotifications } from '../services/notifications';
 
 export default function AdminDashboard({ navigation }) {
   const [orders, setOrders] = useState([]);
@@ -10,19 +12,31 @@ export default function AdminDashboard({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const { theme } = useTheme();
   const initialFetched = useRef(false);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+  const channelRef = useRef(null);
+  const ordersMapRef = useRef({});
 
   useEffect(() => {
-    // Initial load
     loadOrders(false);
+    requestNotificationPermissions();
 
-    // Refetch on every return to this screen
+    console.log('Setting up admin realtime notifications');
+    const channel = subscribeToAdminOrders(ordersMapRef);
+    channelRef.current = channel;
+
     const unsubscribe = navigation.addListener('focus', () => {
       if (initialFetched.current) {
         loadOrders(true);
       }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (channelRef.current) {
+        console.log('Cleaning up admin subscription');
+        unsubscribeFromNotifications(channelRef.current);
+      }
+    };
   }, [navigation]);
 
   const loadOrders = async (isRefresh = false) => {
@@ -33,6 +47,9 @@ export default function AdminDashboard({ navigation }) {
     }
     try {
       const data = await getOrders();
+      data.forEach(order => {
+        ordersMapRef.current[order.id] = order.status;
+      });
       setOrders(data || []);
     } catch (error) {
       console.error('Failed to load orders:', error);
@@ -205,6 +222,13 @@ export default function AdminDashboard({ navigation }) {
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No orders yet</Text>
         }
+      />
+      
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={() => setToast({ ...toast, visible: false })}
       />
     </View>
   );
