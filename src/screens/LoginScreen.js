@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { signIn, saveRememberedEmail, clearRememberedEmail, getRememberedEmail } from '../services/auth';
 import { useTheme } from '../utils/ThemeContext';
@@ -11,6 +11,8 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const { theme, isDarkMode, toggleTheme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -42,9 +44,29 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await signIn(email, password);
+      await signIn(email.trim(), password);
+      if (rememberMe) {
+        await saveRememberedEmail(email.trim());
+      } else {
+        await clearRememberedEmail();
+      }
+      setToast({ visible: true, message: 'Login successful!', type: 'success' });
     } catch (error) {
-      Alert.alert('Login Failed', error.message);
+      console.error('Login error:', error);
+      
+      let errorMessage = 'Unable to sign in. Please try again.';
+      
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password';
+      } else if (error.message?.includes('Network request failed')) {
+        errorMessage = 'Network error. Check your internet connection';
+      } else if (error.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please verify your email address';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setToast({ visible: true, message: errorMessage, type: 'error' });
     } finally {
       setLoading(false);
     }
