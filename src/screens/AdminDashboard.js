@@ -177,6 +177,17 @@ export default function AdminDashboard({ navigation }) {
           </View>
           <Text style={[styles.actionText, { color: theme.textPrimary }]}>Optimize Routes</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.actionButton, { backgroundColor: theme.cardBackground }]}
+          onPress={() => navigation.navigate('AIChatbot')}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: theme.primaryBlueLight }]}>
+            <Text style={[styles.actionIcon, { color: theme.white }]}>🤖</Text>
+          </View>
+          <Text style={[styles.actionText, { color: theme.textPrimary }]}>AI Assistant</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.ordersHeader}>

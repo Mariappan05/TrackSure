@@ -20,6 +20,7 @@ import OrderDetailsScreen from '../screens/OrderDetailsScreen';
 import DeliveryProofScreen from '../screens/DeliveryProofScreen';
 import DriverPerformanceScreen from '../screens/DriverPerformanceScreen';
 import RouteOptimizationScreen from '../screens/RouteOptimizationScreen';
+import ChatbotScreen from '../screens/ChatbotScreen';
 
 const Stack = createStackNavigator();
 
@@ -115,6 +116,7 @@ export default function AppNavigator() {
             <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
             <Stack.Screen name="DriverPerformance" component={DriverPerformanceScreen} />
             <Stack.Screen name="RouteOptimization" component={RouteOptimizationScreen} />
+            <Stack.Screen name="AIChatbot" component={ChatbotScreen} />
           </>
         ) : (
           <>
