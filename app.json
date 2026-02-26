@@ -1,29 +1,56 @@
 {
   "expo": {
     "name": "TrackSure",
-    "slug": "TrackSure",
+    "slug": "tracksure",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+    "sdkVersion": "52.0.0",
+    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tracksure.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyAEg8VrEBZN8mbwa0nd8EvFxuKiUOelFno"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "TrackSure needs your location to track deliveries.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "TrackSure needs your location to track deliveries in the background.",
+        "NSCameraUsageDescription": "TrackSure needs camera access to capture delivery proof photos.",
+        "NSPhotoLibraryUsageDescription": "TrackSure needs photo library access to save delivery proof."
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "android": {
+      "package": "com.tracksure.app",
+      "usesCleartextTraffic": true,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAEg8VrEBZN8mbwa0nd8EvFxuKiUOelFno"
+        }
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow TrackSure to use your location for delivery tracking."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TrackSure needs access to your photos to capture delivery proof."
+        }
+      ]
+    ]
   }
 }
