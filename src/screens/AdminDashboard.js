@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { getOrders } from '../services/orders';
 import { signOut } from '../services/auth';
@@ -7,37 +7,40 @@ import { useTheme } from '../utils/ThemeContext';
 export default function AdminDashboard({ navigation }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { theme } = useTheme();
+  const initialFetched = useRef(false);
 
   useEffect(() => {
+    // Initial load
+    loadOrders(false);
+
+    // Refetch on every return to this screen
     const unsubscribe = navigation.addListener('focus', () => {
-      loadOrders();
+      if (initialFetched.current) {
+        loadOrders(true);
+      }
     });
-    
+
     return unsubscribe;
   }, [navigation]);
 
-  useEffect(() => {
-    // Set timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setLoading(false);
-        setOrders([]);
-      }
-    }, 10000); // 10 second timeout
-    
-    return () => clearTimeout(timeout);
-  }, []);
-
-  const loadOrders = async () => {
+  const loadOrders = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const data = await getOrders();
       setOrders(data || []);
     } catch (error) {
       console.error('Failed to load orders:', error);
-      setOrders([]);
+      if (!isRefresh) setOrders([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      initialFetched.current = true;
     }
   };
 
@@ -186,8 +189,8 @@ export default function AdminDashboard({ navigation }) {
         renderItem={renderOrder}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
-        refreshing={loading}
-        onRefresh={loadOrders}
+        refreshing={refreshing}
+        onRefresh={() => loadOrders(true)}
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No orders yet</Text>
         }

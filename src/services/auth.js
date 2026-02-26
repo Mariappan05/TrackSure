@@ -22,14 +22,31 @@ export const signIn = async (email, password) => {
       .from('profiles')
       .select('role')
       .eq('id', data.user.id)
-      .single();
+      .maybeSingle();
     
     if (profileError) {
       console.error('Profile fetch error:', profileError);
     }
     
+    // If no profile exists, auto-create one with default role 'driver'
+    if (!profile) {
+      console.log('No profile found, creating default profile...');
+      const defaultRole = 'driver';
+      const { error: insertError } = await supabase.from('profiles').insert({
+        id: data.user.id,
+        full_name: data.user.email?.split('@')[0] || 'User',
+        email: data.user.email,
+        role: defaultRole
+      });
+      if (insertError) {
+        console.error('Auto-create profile error:', insertError);
+      }
+      console.log('Default profile created with role:', defaultRole);
+      return { user: data.user, role: defaultRole };
+    }
+    
     console.log('Profile data:', profile);
-    return { user: data.user, role: profile?.role };
+    return { user: data.user, role: profile.role };
   } catch (error) {
     console.error('SignIn error:', error.message);
     throw error;
@@ -81,9 +98,9 @@ export const getCurrentUser = async () => {
       .from('profiles')
       .select('role, full_name')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
     
-    return { ...user, role: profile?.role, fullName: profile?.full_name };
+    return { ...user, role: profile?.role || 'driver', fullName: profile?.full_name || user.email?.split('@')[0] };
   } catch (error) {
     // Silent fail - user not logged in
     return null;
