@@ -2,9 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { ActivityIndicator, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCurrentUser } from '../services/auth';
 import { supabase } from '../services/supabase';
 import Colors from '../utils/colors';
+
+const USER_CACHE_KEY = 'tracksure_cached_user';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -36,6 +39,12 @@ export default function AppNavigator() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event);
+      // INITIAL_SESSION is already handled by checkUser() using local storage
+      if (event === 'INITIAL_SESSION') return;
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        return;
+      }
       if (session?.user) {
         const currentUser = await getCurrentUser();
         setUser(currentUser);
@@ -51,11 +60,31 @@ export default function AppNavigator() {
 
   const checkUser = async () => {
     try {
-      const currentUser = await getCurrentUser();
-      console.log('Current user:', currentUser);
-      setUser(currentUser);
+      // getSession() reads from AsyncStorage — no network call, works on reload
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        setUser(null);
+        return;
+      }
+      // Use full cached profile instantly — zero network, no Loading flicker
+      const raw = await AsyncStorage.getItem(USER_CACHE_KEY);
+      const cachedUser = raw ? JSON.parse(raw) : null;
+      if (cachedUser) {
+        const u = {
+          ...session.user,
+          role: cachedUser.role || 'driver',
+          fullName: cachedUser.fullName || session.user.email?.split('@')[0],
+        };
+        setUser(u);
+        // Refresh from network in background to keep profile in sync
+        getCurrentUser().then(fresh => { if (fresh) setUser(fresh); }).catch(() => {});
+      } else {
+        // No cache yet (first login) — must fetch from DB
+        const currentUser = await getCurrentUser();
+        setUser(currentUser);
+      }
     } catch (error) {
-      // Silent fail
+      setUser(null);
     } finally {
       setLoading(false);
     }

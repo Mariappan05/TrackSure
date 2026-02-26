@@ -11,7 +11,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.tracksure.app",
       "config": {
-        "googleMapsApiKey": "AIzaSyAEg8VrEBZN8mbwa0nd8EvFxuKiUOelFno"
+        "googleMapsApiKey": "DO_NOT_USE — see app.config.js"
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "TrackSure needs your location to track deliveries.",
@@ -25,7 +25,7 @@
       "usesCleartextTraffic": true,
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyAEg8VrEBZN8mbwa0nd8EvFxuKiUOelFno"
+          "apiKey": "DO_NOT_USE — see app.config.js"
         }
       },
       "permissions": [

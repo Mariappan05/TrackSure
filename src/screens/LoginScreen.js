@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { signIn } from '../services/auth';
+import { signIn, saveRememberedEmail, clearRememberedEmail, getRememberedEmail } from '../services/auth';
 import { useTheme } from '../utils/ThemeContext';
 import { fadeIn, slideUp } from '../utils/animations';
 
@@ -10,6 +11,7 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const { theme, isDarkMode, toggleTheme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -19,6 +21,13 @@ export default function LoginScreen({ navigation }) {
       fadeIn(fadeAnim),
       slideUp(slideAnim)
     ]).start();
+    // Pre-fill saved email if available
+    getRememberedEmail().then(saved => {
+      if (saved) {
+        setEmail(saved);
+        setRememberMe(true);
+      }
+    });
   }, []);
 
   const handleLogin = async () => {
@@ -29,9 +38,28 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await signIn(email, password);
+      await signIn(email.trim(), password);
+      // Save or clear remembered email based on toggle
+      if (rememberMe) {
+        await saveRememberedEmail(email.trim());
+      } else {
+        await clearRememberedEmail();
+      }
     } catch (error) {
-      Alert.alert('Login Failed', error.message);
+      const msg = error?.message || '';
+      if (
+        msg.toLowerCase().includes('network') ||
+        msg.toLowerCase().includes('connection') ||
+        msg.toLowerCase().includes('fetch')
+      ) {
+        Alert.alert(
+          'Connection Problem',
+          'Could not reach the server. This usually resolves on its own — please try again.',
+          [{ text: 'Try Again', style: 'default' }]
+        );
+      } else {
+        Alert.alert('Login Failed', msg || 'Something went wrong. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -82,6 +110,18 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.eyeText}>{showPassword ? '👁️' : '👁️🗨️'}</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Remember Me toggle */}
+          <TouchableOpacity
+            style={styles.rememberRow}
+            onPress={() => setRememberMe(!rememberMe)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.checkbox, { borderColor: theme.primaryBlue, backgroundColor: rememberMe ? theme.primaryBlue : 'transparent' }]}>
+              {rememberMe && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={[styles.rememberText, { color: theme.textPrimary }]}>Remember me</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.button, { backgroundColor: theme.secondaryGreen }, loading && styles.buttonDisabled]} 
@@ -192,5 +232,28 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 14,
     fontWeight: '600',
+  },
+  rememberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 10,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkmark: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  rememberText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

@@ -537,6 +537,7 @@ export default function CreateOrderScreen({ navigation }) {
           { text: 'View Route', onPress: () => {
             const url = `https://www.google.com/maps/dir/?api=1&origin=${pickupGeo.lat},${pickupGeo.lng}&destination=${dropGeo.lat},${dropGeo.lng}&travelmode=driving`;
             Linking.openURL(url);
+            navigation.goBack();
           }},
           { text: 'Done', onPress: () => navigation.goBack() }
         ]

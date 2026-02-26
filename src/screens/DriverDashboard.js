@@ -12,6 +12,7 @@ import { CustomAlert } from '../utils/CustomAlert';
 export default function DriverDashboard({ navigation }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [user, setUser] = useState(null);
   const { theme } = useTheme();
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
@@ -34,12 +35,18 @@ export default function DriverDashboard({ navigation }) {
 
   const loadOrders = async (driverId) => {
     try {
+      setLoadError(null);
       const data = await getDriverOrders(driverId);
       // Sort by sequence for optimized route display
       const sortedData = data.sort((a, b) => (a.sequence || 999) - (b.sequence || 999));
       setOrders(sortedData);
     } catch (error) {
-      console.error('Failed to load orders:', error);
+      const msg = error?.message || '';
+      if (msg.includes('525') || msg.includes('Network request failed')) {
+        setLoadError('Connection issue (SSL/network). Please check your internet and retry.');
+      } else {
+        setLoadError('Failed to load orders. Tap Retry to try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -186,6 +193,27 @@ export default function DriverDashboard({ navigation }) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.backgroundLight }]}>
         <ActivityIndicator size="large" color={theme.primaryBlue} />
+        <Text style={{ color: theme.textSecondary, marginTop: 12, fontSize: 13 }}>Loading orders...</Text>
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.backgroundLight }]}>
+        <Text style={{ fontSize: 40, marginBottom: 12 }}>⚠️</Text>
+        <Text style={{ color: theme.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 8, textAlign: 'center' }}>
+          Could not load orders
+        </Text>
+        <Text style={{ color: theme.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 24, paddingHorizontal: 32 }}>
+          {loadError}
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor: theme.primaryBlue, paddingHorizontal: 32, paddingVertical: 12, borderRadius: 10 }}
+          onPress={() => { setLoading(true); loadOrders(user?.id); }}
+        >
+          <Text style={{ color: theme.white, fontWeight: '700', fontSize: 15 }}>🔄 Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
