@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { signIn, saveRememberedEmail, clearRememberedEmail, getRememberedEmail } from '../services/auth';
 import { useTheme } from '../utils/ThemeContext';
 import { fadeIn, slideUp } from '../utils/animations';
+import { Toast } from '../utils/Toast';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const { theme, isDarkMode, toggleTheme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -31,35 +30,21 @@ export default function LoginScreen({ navigation }) {
   }, []);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill all fields');
+    if (!email.trim() || !password.trim()) {
+      setToast({ visible: true, message: 'Please enter both email and password', type: 'error' });
+      return;
+    }
+
+    if (!email.includes('@')) {
+      setToast({ visible: true, message: 'Please enter a valid email address', type: 'error' });
       return;
     }
 
     setLoading(true);
     try {
-      await signIn(email.trim(), password);
-      // Save or clear remembered email based on toggle
-      if (rememberMe) {
-        await saveRememberedEmail(email.trim());
-      } else {
-        await clearRememberedEmail();
-      }
+      await signIn(email, password);
     } catch (error) {
-      const msg = error?.message || '';
-      if (
-        msg.toLowerCase().includes('network') ||
-        msg.toLowerCase().includes('connection') ||
-        msg.toLowerCase().includes('fetch')
-      ) {
-        Alert.alert(
-          'Connection Problem',
-          'Could not reach the server. This usually resolves on its own — please try again.',
-          [{ text: 'Try Again', style: 'default' }]
-        );
-      } else {
-        Alert.alert('Login Failed', msg || 'Something went wrong. Please try again.');
-      }
+      Alert.alert('Login Failed', error.message);
     } finally {
       setLoading(false);
     }
@@ -136,6 +121,13 @@ export default function LoginScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </Animated.View>
+      
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={() => setToast({ ...toast, visible: false })}
+      />
     </LinearGradient>
   );
 }

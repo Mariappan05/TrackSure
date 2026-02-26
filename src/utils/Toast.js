@@ -44,8 +44,8 @@ export const Toast = ({ visible, message, type = 'success', onHide }) => {
 
   if (!visible) return null;
 
-  const bgColor = type === 'success' ? theme.secondaryGreen : type === 'error' ? theme.error : theme.warning;
-  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+  const bgColor = type === 'success' ? theme.secondaryGreen : type === 'error' ? theme.error : type === 'info' ? theme.primaryBlue : theme.warning;
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : type === 'info' ? 'ℹ' : '⚠';
 
   return (
     <Animated.View 
