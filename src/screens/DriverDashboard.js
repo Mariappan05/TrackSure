@@ -29,10 +29,20 @@ export default function DriverDashboard({ navigation }) {
     loadUser();
     requestNotificationPermissions();
     
+    const orderUpdatesChannel = supabase
+      .channel('driver-order-updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders(prev => prev.map(order => 
+          order.id === payload.new.id ? { ...order, ...payload.new } : order
+        ));
+      })
+      .subscribe();
+    
     return () => {
       if (notificationChannel) {
         unsubscribeFromNotifications(notificationChannel);
       }
+      orderUpdatesChannel.unsubscribe();
     };
   }, []);
 
@@ -219,7 +229,15 @@ export default function DriverDashboard({ navigation }) {
         )}
         <View style={styles.metaItem}>
           <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>📅 Created</Text>
-          <Text style={[styles.metaValue, { color: theme.textPrimary }]}>{new Date(item.created_at).toLocaleDateString()}</Text>
+          <Text style={[styles.metaValue, { color: theme.textPrimary }]}>{
+            (() => {
+              const date = new Date(item.created_at);
+              const day = date.getDate().toString().padStart(2, '0');
+              const month = (date.getMonth() + 1).toString().padStart(2, '0');
+              const year = date.getFullYear();
+              return `${day}-${month}-${year}`;
+            })()
+          }</Text>
         </View>
       </View>
       
@@ -306,15 +324,6 @@ export default function DriverDashboard({ navigation }) {
         contentContainerStyle={styles.list}
         refreshing={loading}
         onRefresh={() => loadOrders(user.id)}
-        ListHeaderComponent={
-          orders.length > 1 && orders.some(o => o.sequence > 1) ? (
-            <View style={[styles.optimizationBanner, { backgroundColor: theme.secondaryGreen }]}>
-              <Text style={[styles.bannerText, { color: theme.white }]}>
-                🗺️ Route Optimized! Follow the sequence numbers for fastest delivery
-              </Text>
-            </View>
-          ) : null
-        }
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No orders assigned</Text>
         }

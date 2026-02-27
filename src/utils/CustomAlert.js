@@ -23,18 +23,21 @@ export const CustomAlert = ({ visible, title, message, buttons, onDismiss, image
     const routeColor = orderColors[selectedOrder % orderColors.length].hex.replace('#', '0x');
     const num = selectedOrder + 1;
     
-    // Calculate distance and appropriate zoom level
+    // Calculate distance and appropriate zoom level with padding
     const latDiff = Math.abs(parseFloat(order.pickup_lat) - parseFloat(order.drop_lat));
     const lngDiff = Math.abs(parseFloat(order.pickup_lng) - parseFloat(order.drop_lng));
     const maxDiff = Math.max(latDiff, lngDiff);
     
+    // Add 30% padding to ensure both markers are visible
+    const paddedDiff = maxDiff * 1.3;
+    
     // Determine zoom level based on distance
     let zoom;
-    if (maxDiff > 1) zoom = 8;        // Very long distance
-    else if (maxDiff > 0.5) zoom = 9;  // Long distance
-    else if (maxDiff > 0.2) zoom = 10; // Medium distance
-    else if (maxDiff > 0.1) zoom = 11; // Short distance
-    else if (maxDiff > 0.05) zoom = 12; // Very short distance
+    if (paddedDiff > 1) zoom = 8;        // Very long distance
+    else if (paddedDiff > 0.5) zoom = 9;  // Long distance
+    else if (paddedDiff > 0.2) zoom = 10; // Medium distance
+    else if (paddedDiff > 0.1) zoom = 11; // Short distance
+    else if (paddedDiff > 0.05) zoom = 12; // Very short distance
     else zoom = 13;                     // Nearby locations
     
     const centerLat = (parseFloat(order.pickup_lat) + parseFloat(order.drop_lat)) / 2;

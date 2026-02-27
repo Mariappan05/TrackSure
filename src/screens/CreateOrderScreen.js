@@ -332,6 +332,8 @@ export default function CreateOrderScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [loadingDrivers, setLoadingDrivers] = useState(true);
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [gettingPickupLocation, setGettingPickupLocation] = useState(false);
+  const [gettingDropLocation, setGettingDropLocation] = useState(false);
   const [routeCoords, setRouteCoords] = useState(null);
   const { theme } = useTheme();
   const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', buttons: [], imageUrl: null });
@@ -339,6 +341,7 @@ export default function CreateOrderScreen({ navigation }) {
 
   // Map picker state
   const [showMapPicker, setShowMapPicker] = useState(false);
+  const [mapPickerType, setMapPickerType] = useState('drop'); // 'pickup' or 'drop'
   const [mapPickerCoords, setMapPickerCoords] = useState(null);
   const [mapPickerAddress, setMapPickerAddress] = useState('');
   const [reverseGeoLoading, setReverseGeoLoading] = useState(false);
@@ -395,11 +398,16 @@ export default function CreateOrderScreen({ navigation }) {
     }
   };
 
-  // Confirm map selection as drop address
+  // Confirm map selection
   const confirmMapSelection = () => {
     if (mapPickerCoords && mapPickerAddress) {
-      setDropAddress(mapPickerAddress);
-      setToast({ visible: true, message: 'Drop location set from map', type: 'success' });
+      if (mapPickerType === 'pickup') {
+        setPickupAddress(mapPickerAddress);
+        setToast({ visible: true, message: 'Pickup location set from map', type: 'success' });
+      } else {
+        setDropAddress(mapPickerAddress);
+        setToast({ visible: true, message: 'Drop location set from map', type: 'success' });
+      }
       setShowMapPicker(false);
       setMapPickerCoords(null);
       setMapPickerAddress('');
@@ -422,8 +430,12 @@ export default function CreateOrderScreen({ navigation }) {
     }
   };
 
-  const getCurrentLocation = async () => {
-    setGettingLocation(true);
+  const getCurrentLocation = async (type = 'pickup') => {
+    if (type === 'pickup') {
+      setGettingPickupLocation(true);
+    } else {
+      setGettingDropLocation(true);
+    }
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -445,13 +457,22 @@ export default function CreateOrderScreen({ navigation }) {
         location.coords.longitude
       );
 
-      setPickupAddress(address);
-      setToast({ visible: true, message: 'Current location set as pickup address', type: 'success' });
+      if (type === 'pickup') {
+        setPickupAddress(address);
+        setToast({ visible: true, message: 'Current location set as pickup address', type: 'success' });
+      } else {
+        setDropAddress(address);
+        setToast({ visible: true, message: 'Current location set as drop address', type: 'success' });
+      }
     } catch (error) {
       setToast({ visible: true, message: 'Failed to get current location', type: 'error' });
       console.error('Location error:', error);
     } finally {
-      setGettingLocation(false);
+      if (type === 'pickup') {
+        setGettingPickupLocation(false);
+      } else {
+        setGettingDropLocation(false);
+      }
     }
   };
 
@@ -490,6 +511,16 @@ export default function CreateOrderScreen({ navigation }) {
         dropGeo.lat,
         dropGeo.lng
       );
+
+      // Calculate estimated fuel consumption
+      const fuelRates = {
+        bike: 40,
+        car: 15,
+        van: 10,
+        truck: 6
+      };
+      const kmPerLiter = fuelRates[vehicleType] || 15;
+      const estimatedFuel = (routeInfo.distance / kmPerLiter).toFixed(2);
 
       setRouteCoords({ pickup: pickupGeo, drop: dropGeo });
 
@@ -531,7 +562,7 @@ export default function CreateOrderScreen({ navigation }) {
       setAlertConfig({
         visible: true,
         title: '✓ Order Created',
-        message: `Distance: ${routeInfo.distance} km\nDuration: ${routeInfo.trafficDuration} min${trafficMsg}${routeOptions}`,
+        message: `📏 Distance: ${routeInfo.distance} km\n⏱️ Duration: ${routeInfo.trafficDuration} min${trafficMsg}\n\n⛽ Estimated Fuel: ${estimatedFuel}L\n🚗 Vehicle: ${vehicleType.toUpperCase()}\n📊 Efficiency: ${kmPerLiter} km/L${routeOptions}`,
         imageUrl: mapUrl,
         buttons: [
           { text: 'View Route', onPress: () => {
@@ -576,17 +607,25 @@ export default function CreateOrderScreen({ navigation }) {
         <View style={styles.inputGroup}>
           <View style={styles.labelRow}>
             <Text style={[styles.label, { color: theme.textPrimary }]}>📍 Pickup Address</Text>
-            <TouchableOpacity 
-              style={[styles.locationButton, { backgroundColor: theme.primaryBlue }]}
-              onPress={getCurrentLocation}
-              disabled={gettingLocation}
-            >
-              {gettingLocation ? (
-                <ActivityIndicator size="small" color={theme.white} />
-              ) : (
-                <Text style={[styles.locationButtonText, { color: theme.white }]}>📍 Current Location</Text>
-              )}
-            </TouchableOpacity>
+            <View style={styles.buttonGroup}>
+              <TouchableOpacity 
+                style={[styles.locationButton, { backgroundColor: theme.primaryBlue }]}
+                onPress={() => getCurrentLocation('pickup')}
+                disabled={gettingPickupLocation}
+              >
+                {gettingPickupLocation ? (
+                  <ActivityIndicator size="small" color={theme.white} />
+                ) : (
+                  <Text style={[styles.locationButtonText, { color: theme.white }]}>📍 Current</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.locationButton, { backgroundColor: theme.secondaryGreen }]}
+                onPress={() => { setMapPickerType('pickup'); setShowMapPicker(true); }}
+              >
+                <Text style={[styles.locationButtonText, { color: theme.white }]}>🗺️ Map</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <TextInput
             style={[styles.input, { backgroundColor: theme.cardBackground, color: theme.textPrimary, borderColor: theme.border }]}
@@ -601,16 +640,29 @@ export default function CreateOrderScreen({ navigation }) {
         <View style={styles.inputGroup}>
           <View style={styles.labelRow}>
             <Text style={[styles.label, { color: theme.textPrimary }]}>🎯 Drop Address</Text>
-            <TouchableOpacity 
-              style={[styles.locationButton, { backgroundColor: theme.secondaryGreen }]}
-              onPress={() => setShowMapPicker(true)}
-            >
-              <Text style={[styles.locationButtonText, { color: theme.white }]}>🗺️ Pick from Map</Text>
-            </TouchableOpacity>
+            <View style={styles.buttonGroup}>
+              <TouchableOpacity 
+                style={[styles.locationButton, { backgroundColor: theme.primaryBlue }]}
+                onPress={() => getCurrentLocation('drop')}
+                disabled={gettingDropLocation}
+              >
+                {gettingDropLocation ? (
+                  <ActivityIndicator size="small" color={theme.white} />
+                ) : (
+                  <Text style={[styles.locationButtonText, { color: theme.white }]}>📍 Current</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.locationButton, { backgroundColor: theme.secondaryGreen }]}
+                onPress={() => { setMapPickerType('drop'); setShowMapPicker(true); }}
+              >
+                <Text style={[styles.locationButtonText, { color: theme.white }]}>🗺️ Map</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <TextInput
             style={[styles.input, { backgroundColor: theme.cardBackground, color: theme.textPrimary, borderColor: theme.border }]}
-            placeholder="Enter drop address or pick from map"
+            placeholder="Enter drop address"
             placeholderTextColor={theme.textSecondary}
             value={dropAddress}
             onChangeText={setDropAddress}
@@ -684,7 +736,7 @@ export default function CreateOrderScreen({ navigation }) {
           <TouchableOpacity onPress={() => { setShowMapPicker(false); setMapPickerCoords(null); setMapPickerAddress(''); }}>
             <Text style={[styles.mapHeaderBtn, { color: theme.white }]}>✕ Cancel</Text>
           </TouchableOpacity>
-          <Text style={[styles.mapHeaderTitle, { color: theme.white }]}>Pick Drop Location</Text>
+          <Text style={[styles.mapHeaderTitle, { color: theme.white }]}>Pick {mapPickerType === 'pickup' ? 'Pickup' : 'Drop'} Location</Text>
           <TouchableOpacity
             onPress={confirmMapSelection}
             disabled={!mapPickerCoords || reverseGeoLoading}
@@ -817,8 +869,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    minWidth: 140,
+    minWidth: 70,
     alignItems: 'center',
+  },
+  buttonGroup: {
+    flexDirection: 'row',
+    gap: 8,
   },
   locationButtonText: {
     fontSize: 12,

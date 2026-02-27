@@ -5,6 +5,7 @@ import { signOut } from '../services/auth';
 import { useTheme } from '../utils/ThemeContext';
 import { Toast } from '../utils/Toast';
 import { subscribeToAdminOrders, requestNotificationPermissions, unsubscribeFromNotifications } from '../services/notifications';
+import { supabase } from '../services/supabase';
 
 export default function AdminDashboard({ navigation }) {
   const [orders, setOrders] = useState([]);
@@ -23,6 +24,15 @@ export default function AdminDashboard({ navigation }) {
     console.log('Setting up admin realtime notifications');
     const channel = subscribeToAdminOrders(ordersMapRef);
     channelRef.current = channel;
+    
+    const orderUpdatesChannel = supabase
+      .channel('admin-order-updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders(prev => prev.map(order => 
+          order.id === payload.new.id ? { ...order, ...payload.new } : order
+        ));
+      })
+      .subscribe();
 
     const unsubscribe = navigation.addListener('focus', () => {
       if (initialFetched.current) {
@@ -36,6 +46,7 @@ export default function AdminDashboard({ navigation }) {
         console.log('Cleaning up admin subscription');
         unsubscribeFromNotifications(channelRef.current);
       }
+      orderUpdatesChannel.unsubscribe();
     };
   }, [navigation]);
 
@@ -53,6 +64,11 @@ export default function AdminDashboard({ navigation }) {
       setOrders(data || []);
     } catch (error) {
       console.error('Failed to load orders:', error);
+      if (error.message?.includes('Network request failed')) {
+        setToast({ visible: true, message: 'Network error. Check your internet connection.', type: 'error' });
+      } else {
+        setToast({ visible: true, message: 'Failed to load orders', type: 'error' });
+      }
       if (!isRefresh) setOrders([]);
     } finally {
       setLoading(false);
@@ -72,44 +88,116 @@ export default function AdminDashboard({ navigation }) {
     }
   };
 
+  const handleDeleteOrder = async (orderId, orderStatus) => {
+    if (orderStatus !== 'pending' && orderStatus !== 'delivered') {
+      setToast({ visible: true, message: 'Only pending and delivered orders can be deleted', type: 'error' });
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+      
+      if (error) throw error;
+      
+      setOrders(prev => prev.filter(order => order.id !== orderId));
+      setToast({ visible: true, message: 'Order deleted successfully', type: 'success' });
+    } catch (error) {
+      console.error('Delete order error:', error);
+      setToast({ visible: true, message: 'Failed to delete order', type: 'error' });
+    }
+  };
+
   const renderOrder = ({ item }) => (
-    <TouchableOpacity 
-      style={[styles.orderCard, { backgroundColor: theme.cardBackground }, item.status === 'assigned' && { backgroundColor: theme.lightBlue }]}
-      onPress={() => navigation.navigate('OrderDetails', { order: item })}
-    >
-      <View style={styles.orderHeader}>
-        <View style={[styles.statusBadge, styles[item.status]]}>
-          <Text style={[styles.statusText, { color: theme.white }]}>{item.status}</Text>
+    <View style={styles.orderCardWrapper}>
+      <TouchableOpacity 
+        style={[styles.orderCard, { backgroundColor: theme.cardBackground }, item.status === 'assigned' && { backgroundColor: theme.lightBlue }]}
+        onPress={() => navigation.navigate('OrderDetails', { order: item })}
+      >
+        <View style={styles.orderHeader}>
+          <View style={[styles.statusBadge, styles[item.status]]}>
+            <Text style={[styles.statusText, { color: theme.white }]}>{item.status}</Text>
+          </View>
+          {item.is_flagged && (
+            <View style={[styles.flagBadge, { backgroundColor: theme.error }]}>
+              <Text style={[styles.flagText, { color: theme.white }]}>⚠ FLAGGED</Text>
+            </View>
+          )}
         </View>
-        {item.is_flagged && (
-          <View style={[styles.flagBadge, { backgroundColor: theme.error }]}>
-            <Text style={[styles.flagText, { color: theme.white }]}>⚠ FLAGGED</Text>
+        <View style={styles.addressRow}>
+          <Text style={styles.addressIcon}>📍</Text>
+          <Text style={[styles.address, { color: theme.textSecondary }]} numberOfLines={1}>{item.pickup_address}</Text>
+        </View>
+        <View style={styles.addressRow}>
+          <Text style={styles.addressIcon}>🎯</Text>
+          <Text style={[styles.address, { color: theme.textSecondary }]} numberOfLines={1}>{item.drop_address}</Text>
+        </View>
+        
+        {/* Distance & Time Metrics */}
+        <View style={styles.metricsRow}>
+          <View style={styles.metricItem}>
+            <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>📏 Planned</Text>
+            <Text style={[styles.metricValue, { color: theme.primaryBlue }]}>{item.planned_distance} km</Text>
+          </View>
+          {item.actual_distance > 0 && (
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>🛣️ Actual</Text>
+              <Text style={[styles.metricValue, { color: theme.secondaryGreen }]}>{item.actual_distance} km</Text>
+            </View>
+          )}
+          {item.travel_time_minutes > 0 && (
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>⏱️ Time</Text>
+              <Text style={[styles.metricValue, { color: theme.textPrimary }]}>{item.travel_time_minutes} min</Text>
+            </View>
+          )}
+        </View>
+        
+        {/* Fuel Consumption */}
+        {item.fuel_consumed_liters > 0 && (
+          <View style={[styles.fuelBadge, { backgroundColor: theme.lightBlue }]}>
+            <Text style={[styles.fuelText, { color: theme.primaryBlue }]}>⛽ {item.fuel_consumed_liters}L consumed</Text>
           </View>
         )}
-      </View>
-      <View style={styles.addressRow}>
-        <Text style={styles.addressIcon}>📍</Text>
-        <Text style={[styles.address, { color: theme.textSecondary }]} numberOfLines={1}>{item.pickup_address}</Text>
-      </View>
-      <View style={styles.addressRow}>
-        <Text style={styles.addressIcon}>🎯</Text>
-        <Text style={[styles.address, { color: theme.textSecondary }]} numberOfLines={1}>{item.drop_address}</Text>
-      </View>
-      <View style={[styles.orderFooter, { borderTopColor: theme.border }]}>
-        <Text style={[styles.driver, { color: theme.textPrimary }]}>👤 {item.driver?.full_name || 'Unassigned'}</Text>
-        <Text style={[styles.distance, { color: theme.primaryBlue }]}>{item.planned_distance} km</Text>
-      </View>
-      {item.is_flagged && (
-        <View style={[styles.flagReasonBox, { backgroundColor: theme.background }]}>
-          <Text style={[styles.flagReasonText, { color: theme.error }]}>{item.flag_reason}</Text>
+        
+        <View style={[styles.orderFooter, { borderTopColor: theme.border }]}>
+          <Text style={[styles.driver, { color: theme.textPrimary }]}>👤 {item.driver?.full_name || 'Unassigned'}</Text>
+          <Text style={[styles.vehicle, { color: theme.textSecondary }]}>🚗 {item.vehicle_type || 'N/A'}</Text>
         </View>
-      )}
+        {item.is_flagged && (
+          <View style={[styles.flagReasonBox, { backgroundColor: theme.background }]}>
+            <Text style={[styles.flagReasonText, { color: theme.error }]}>{item.flag_reason}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+      
       {item.status === 'delivered' && (
-        <View style={[styles.deliveredBadge, { backgroundColor: theme.lightBlue }]}>
-          <Text style={[styles.deliveredText, { color: theme.primaryBlue }]}>✓ Tap to view proof</Text>
+        <View style={styles.deliveredActions}>
+          <TouchableOpacity 
+            style={[styles.deliveredBadge, { backgroundColor: theme.lightBlue }]}
+            onPress={() => navigation.navigate('OrderDetails', { order: item })}
+          >
+            <Text style={[styles.deliveredText, { color: theme.primaryBlue }]}>✓ Tap to view proof</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.deleteButton, { backgroundColor: theme.error }]}
+            onPress={(e) => { e.stopPropagation(); handleDeleteOrder(item.id, item.status); }}
+          >
+            <Text style={[styles.deleteButtonText, { color: theme.white }]}>🗑️ Delete</Text>
+          </TouchableOpacity>
         </View>
       )}
-    </TouchableOpacity>
+      {item.status === 'pending' && (
+        <TouchableOpacity 
+          style={[styles.deleteButtonFull, { backgroundColor: theme.error }]}
+          onPress={(e) => { e.stopPropagation(); handleDeleteOrder(item.id, item.status); }}
+        >
+          <Text style={[styles.deleteButtonText, { color: theme.white }]}>🗑️ Delete Order</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 
   if (loading) {
@@ -171,28 +259,6 @@ export default function AdminDashboard({ navigation }) {
             <Text style={[styles.actionIcon, { color: theme.white }]}>📊</Text>
           </View>
           <Text style={[styles.actionText, { color: theme.textPrimary }]}>Analytics</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: theme.cardBackground }]}
-          onPress={() => navigation.navigate('DriverPerformance')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: theme.primaryBlueLight }]}>
-            <Text style={[styles.actionIcon, { color: theme.white }]}>🏆</Text>
-          </View>
-          <Text style={[styles.actionText, { color: theme.textPrimary }]}>Performance</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: theme.cardBackground }]}
-          onPress={() => navigation.navigate('RouteOptimization')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: theme.primaryBlueLight }]}>
-            <Text style={[styles.actionIcon, { color: theme.white }]}>🗺️</Text>
-          </View>
-          <Text style={[styles.actionText, { color: theme.textPrimary }]}>Optimize Routes</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -316,10 +382,12 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 0,
   },
+  orderCardWrapper: {
+    marginBottom: 12,
+  },
   orderCard: {
     padding: 16,
     borderRadius: 12,
-    marginBottom: 12,
   },
   orderHeader: {
     marginBottom: 12,
@@ -344,6 +412,9 @@ const styles = StyleSheet.create({
   delivered: {
     backgroundColor: '#10B981',
   },
+  in_progress: {
+    backgroundColor: '#8B5CF6',
+  },
   addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -367,8 +438,35 @@ const styles = StyleSheet.create({
   driver: {
     fontSize: 14,
   },
-  distance: {
+  vehicle: {
+    fontSize: 12,
+    textTransform: 'capitalize',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 12,
+  },
+  metricItem: {
+    flex: 1,
+  },
+  metricLabel: {
+    fontSize: 11,
+    marginBottom: 2,
+  },
+  metricValue: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  fuelBadge: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  fuelText: {
+    fontSize: 12,
     fontWeight: '600',
   },
   emptyText: {
@@ -376,11 +474,31 @@ const styles = StyleSheet.create({
     marginTop: 50,
   },
   deliveredBadge: {
-    marginTop: 8,
+    flex: 1,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 6,
-    alignSelf: 'flex-start',
+  },
+  deliveredActions: {
+    flexDirection: 'row',
+    marginTop: 8,
+    gap: 8,
+  },
+  deleteButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  deleteButtonFull: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   deliveredText: {
     fontSize: 11,

@@ -136,26 +136,32 @@ export default function DashboardScreen({ navigation }) {
             <View style={[styles.iconCircle, { backgroundColor: theme.warning }]}>
               <Text style={styles.detailIcon}>📍</Text>
             </View>
-            <Text style={[styles.detailTitle, { color: theme.textPrimary }]}>Distance Statistics</Text>
+            <Text style={[styles.detailTitle, { color: theme.textPrimary }]}>Distance Comparison</Text>
           </View>
           
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Total Distance</Text>
-            <Text style={[styles.detailValue, { color: theme.textPrimary }]}>{stats.totalDistance} km</Text>
-          </View>
-          <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Average Distance</Text>
-            <Text style={[styles.detailValue, { color: theme.textPrimary }]}>{avgDistance} km</Text>
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Estimated Distance</Text>
+            <Text style={[styles.detailValue, { color: theme.primaryBlue }]}>{stats.totalDistance} km</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Longest Delivery</Text>
-            <Text style={[styles.detailValue, { color: theme.warning }]}>
-              {longestDelivery} km
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Actual Distance</Text>
+            <Text style={[styles.detailValue, { color: theme.secondaryGreen }]}>{stats.totalActualDistance} km</Text>
+          </View>
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Difference</Text>
+            <Text style={[styles.detailValue, { color: parseFloat(stats.totalActualDistance) > parseFloat(stats.totalDistance) ? theme.error : theme.secondaryGreen }]}>
+              {(parseFloat(stats.totalActualDistance) - parseFloat(stats.totalDistance)).toFixed(2)} km
             </Text>
+          </View>
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Average per Order</Text>
+            <Text style={[styles.detailValue, { color: theme.textPrimary }]}>{avgDistance} km</Text>
           </View>
         </View>
 
@@ -164,52 +170,60 @@ export default function DashboardScreen({ navigation }) {
             <View style={[styles.iconCircle, { backgroundColor: theme.warning }]}>
               <Text style={styles.detailIcon}>⛽</Text>
             </View>
-            <Text style={[styles.detailTitle, { color: theme.textPrimary }]}>Fuel Cost Analysis</Text>
+            <Text style={[styles.detailTitle, { color: theme.textPrimary }]}>Fuel Comparison</Text>
           </View>
           
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Planned Fuel Cost</Text>
-            <Text style={[styles.detailValue, { color: theme.textPrimary }]}>₹{plannedFuelCost.cost}</Text>
-          </View>
-          <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Actual Fuel Cost</Text>
-            <Text style={[styles.detailValue, { color: theme.textPrimary }]}>₹{actualFuelCost.cost}</Text>
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Estimated Fuel</Text>
+            <Text style={[styles.detailValue, { color: theme.primaryBlue }]}>{stats.estimatedFuel} L</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Fuel Savings</Text>
-            <Text style={[styles.detailValue, { color: fuelSavings >= 0 ? theme.secondaryGreen : theme.error }]}>
-              {fuelSavings >= 0 ? '+' : ''}₹{fuelSavings.toFixed(2)}
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Actual Fuel</Text>
+            <Text style={[styles.detailValue, { color: theme.secondaryGreen }]}>{stats.actualFuel} L</Text>
+          </View>
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Difference</Text>
+            <Text style={[styles.detailValue, { color: parseFloat(stats.actualFuel) > parseFloat(stats.estimatedFuel) ? theme.error : theme.secondaryGreen }]}>
+              {(parseFloat(stats.actualFuel) - parseFloat(stats.estimatedFuel)).toFixed(2)} L
             </Text>
           </View>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Fuel Used (Liters)</Text>
-            <Text style={[styles.detailValue, { color: theme.textPrimary }]}>{actualFuelCost.litersUsed}L</Text>
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Fuel Cost (₹100/L)</Text>
+            <Text style={[styles.detailValue, { color: theme.textPrimary }]}>₹{(parseFloat(stats.actualFuel) * 100).toFixed(2)}</Text>
           </View>
         </View>
 
         <View style={[styles.detailCard, { backgroundColor: theme.cardBackground }]}>
           <View style={styles.detailHeader}>
-            <View style={[styles.iconCircle, { backgroundColor: theme.error }]}>
-              <Text style={styles.detailIcon}>⚠️</Text>
+            <View style={[styles.iconCircle, { backgroundColor: theme.primaryBlue }]}>
+              <Text style={styles.detailIcon}>⏱️</Text>
             </View>
-            <Text style={[styles.detailTitle, { color: theme.textPrimary }]}>Fuel Monitoring</Text>
+            <Text style={[styles.detailTitle, { color: theme.textPrimary }]}>Time Comparison</Text>
           </View>
           
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Flagged Orders</Text>
-            <Text style={[styles.detailValue, { color: theme.error }]}>{stats.flaggedOrders || 0}</Text>
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Estimated Time</Text>
+            <Text style={[styles.detailValue, { color: theme.primaryBlue }]}>{stats.estimatedTime} min</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Actual Distance</Text>
-            <Text style={[styles.detailValue, { color: theme.textPrimary }]}>{stats.totalActualDistance || '0.00'} km</Text>
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Actual Time</Text>
+            <Text style={[styles.detailValue, { color: theme.secondaryGreen }]}>{stats.actualTime} min</Text>
+          </View>
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>Difference</Text>
+            <Text style={[styles.detailValue, { color: parseFloat(stats.actualTime) > parseFloat(stats.estimatedTime) ? theme.error : theme.secondaryGreen }]}>
+              {(parseFloat(stats.actualTime) - parseFloat(stats.estimatedTime)).toFixed(0)} min
+            </Text>
           </View>
         </View>
 

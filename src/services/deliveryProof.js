@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { updateActualDistance } from './fuelMonitoring';
 import * as Location from 'expo-location';
 
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -124,9 +123,6 @@ export const submitDeliveryProof = async (orderId, driverId, imageUrl, latitude,
     throw proofError;
   }
   console.log('Delivery proof inserted successfully');
-
-  // Calculate actual distance and check for fuel misuse
-  await updateActualDistance(orderId, driverId);
 
   const { error: orderError } = await supabase
     .from('orders')

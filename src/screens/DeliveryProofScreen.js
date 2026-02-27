@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Tex
 import * as ImagePicker from 'expo-image-picker';
 import { verifyLocation, uploadDeliveryImage, submitDeliveryProof } from '../services/deliveryProof';
 import { getCurrentUser } from '../services/auth';
+import { completeOrderTracking } from '../services/fuelMonitoring';
 import { useTheme } from '../utils/ThemeContext';
 import { CustomAlert } from '../utils/CustomAlert';
 import { Toast } from '../utils/Toast';
@@ -32,7 +33,7 @@ export default function DeliveryProofScreen({ route, navigation }) {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
+      allowsEditing: false,
       quality: 0.7,
     });
 
@@ -125,12 +126,24 @@ export default function DeliveryProofScreen({ route, navigation }) {
         deliveryNotes
       );
 
-      setAlertConfig({
-        visible: true,
-        title: '🎉 Delivery Complete!',
-        message: 'Order has been successfully delivered with photo proof',
-        buttons: [{ text: 'Back to Dashboard', onPress: () => navigation.navigate('DriverDashboard') }]
-      });
+      // Calculate fuel and distance metrics
+      try {
+        const metrics = await completeOrderTracking(order.id);
+        setAlertConfig({
+          visible: true,
+          title: '🎉 Delivery Complete!',
+          message: `Order delivered successfully!\n\n🛣️ Distance Covered: ${metrics.actualDistance} km\n⛽ Fuel Consumed: ${metrics.fuelConsumed}L`,
+          buttons: [{ text: 'Back to Dashboard', onPress: () => navigation.navigate('DriverDashboard') }]
+        });
+      } catch (metricsError) {
+        console.error('Metrics calculation error:', metricsError);
+        setAlertConfig({
+          visible: true,
+          title: '🎉 Delivery Complete!',
+          message: 'Order delivered successfully!',
+          buttons: [{ text: 'Back to Dashboard', onPress: () => navigation.navigate('DriverDashboard') }]
+        });
+      }
     } catch (error) {
       console.error('Delivery proof error:', error);
       setToast({ visible: true, message: error.message, type: 'error' });
@@ -207,10 +220,7 @@ export default function DeliveryProofScreen({ route, navigation }) {
           )}
         </TouchableOpacity>
 
-        <View style={[styles.noteContainer, { backgroundColor: theme.cardBackground, borderLeftColor: theme.warning }]}>
-          <Text style={styles.noteIcon}>⚠️</Text>
-          <Text style={[styles.note, { color: theme.textSecondary }]}>You must be within 50 meters of the delivery location</Text>
-        </View>
+
       </View>
       
       <SignatureCapture
