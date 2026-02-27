@@ -97,6 +97,35 @@ export default function DriverDashboard({ navigation }) {
     }
   };
 
+  const handleDeleteOrder = (orderId) => {
+    setAlertConfig({
+      visible: true,
+      title: '🗑️ Delete Delivered Order?',
+      message: 'This will permanently remove this order from your list. This cannot be undone.',
+      buttons: [
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('orders')
+                .delete()
+                .eq('id', orderId);
+              if (error) throw error;
+              setOrders(prev => prev.filter(order => order.id !== orderId));
+              setToast({ visible: true, message: 'Order deleted', type: 'success' });
+            } catch (error) {
+              console.error('Delete order error:', error);
+              setToast({ visible: true, message: `Failed to delete: ${error.message}`, type: 'error' });
+            }
+          }
+        },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    });
+  };
+
   const acceptOrder = async (orderId) => {
     try {
       const orderToAccept = orders.find(o => o.id === orderId);
@@ -525,5 +554,16 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     marginTop: 50,
+  },
+  deleteButton: {
+    marginTop: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

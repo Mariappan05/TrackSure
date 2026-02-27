@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, TextInput, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { verifyLocation, uploadDeliveryImage, submitDeliveryProof } from '../services/deliveryProof';
 import { getCurrentUser } from '../services/auth';
@@ -152,7 +152,11 @@ export default function DeliveryProofScreen({ route, navigation }) {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <View style={[styles.header, { backgroundColor: theme.primaryBlue }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={[styles.backButton, { color: theme.white }]}>←</Text>
@@ -161,7 +165,12 @@ export default function DeliveryProofScreen({ route, navigation }) {
         <View style={styles.placeholder} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={[styles.infoCard, { backgroundColor: theme.cardBackground }]}>
           <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>🎯 Drop Location</Text>
           <Text style={[styles.infoValue, { color: theme.textPrimary }]}>{order.drop_address}</Text>
@@ -221,8 +230,8 @@ export default function DeliveryProofScreen({ route, navigation }) {
         </TouchableOpacity>
 
 
-      </View>
-      
+      </ScrollView>
+
       <SignatureCapture
         visible={showSignature}
         onSave={(sig) => {
@@ -247,7 +256,7 @@ export default function DeliveryProofScreen({ route, navigation }) {
         type={toast.type}
         onHide={() => setToast({ ...toast, visible: false })}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -273,8 +282,12 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 24,
   },
+  scrollView: {
+    flex: 1,
+  },
   content: {
     padding: 20,
+    paddingBottom: 40,
   },
   infoCard: {
     padding: 16,

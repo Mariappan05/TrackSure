@@ -2,8 +2,8 @@ import { supabase } from './supabase';
 
 // Note: EXPO_PUBLIC_ prefix required for Expo JS bundle access
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-// Use gemini-2.0-flash (stable). Update to gemini-2.5-flash-preview when available.
-const GEMINI_MODEL = 'gemini-2.0-flash';
+// gemini-2.5-flash — best price-performance, high volume, low latency
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 // ─── Schema description given to Gemini ────────────────────────────────────

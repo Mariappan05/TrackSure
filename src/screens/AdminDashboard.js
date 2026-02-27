@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Modal } from 'react-native';
 import { getOrders } from '../services/orders';
 import { signOut } from '../services/auth';
 import { useTheme } from '../utils/ThemeContext';
@@ -14,6 +14,7 @@ export default function AdminDashboard({ navigation }) {
   const { theme } = useTheme();
   const initialFetched = useRef(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+  const [deleteAlert, setDeleteAlert] = useState({ visible: false, orderId: null, orderStatus: null });
   const channelRef = useRef(null);
   const ordersMapRef = useRef({});
 
@@ -88,25 +89,28 @@ export default function AdminDashboard({ navigation }) {
     }
   };
 
-  const handleDeleteOrder = async (orderId, orderStatus) => {
+  const handleDeleteOrder = (orderId, orderStatus) => {
     if (orderStatus !== 'pending' && orderStatus !== 'delivered') {
       setToast({ visible: true, message: 'Only pending and delivered orders can be deleted', type: 'error' });
       return;
     }
-    
+    setDeleteAlert({ visible: true, orderId, orderStatus });
+  };
+
+  const confirmDelete = async () => {
+    const { orderId } = deleteAlert;
+    setDeleteAlert({ visible: false, orderId: null, orderStatus: null });
     try {
       const { error } = await supabase
         .from('orders')
         .delete()
         .eq('id', orderId);
-      
       if (error) throw error;
-      
       setOrders(prev => prev.filter(order => order.id !== orderId));
       setToast({ visible: true, message: 'Order deleted successfully', type: 'success' });
     } catch (error) {
       console.error('Delete order error:', error);
-      setToast({ visible: true, message: 'Failed to delete order', type: 'error' });
+      setToast({ visible: true, message: `Failed to delete: ${error.message}`, type: 'error' });
     }
   };
 
@@ -296,6 +300,39 @@ export default function AdminDashboard({ navigation }) {
         type={toast.type}
         onHide={() => setToast({ ...toast, visible: false })}
       />
+
+      <Modal
+        transparent
+        visible={deleteAlert.visible}
+        animationType="fade"
+        onRequestClose={() => setDeleteAlert({ visible: false, orderId: null, orderStatus: null })}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { backgroundColor: theme.cardBackground }]}>
+            <View style={[styles.modalIconWrap, { backgroundColor: '#FEE2E2' }]}>
+              <Text style={styles.modalIcon}>🗑️</Text>
+            </View>
+            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Delete Order?</Text>
+            <Text style={[styles.modalMessage, { color: theme.textSecondary }]}>
+              This will permanently delete the order and all associated records (delivery proof, location history). This cannot be undone.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalBtnCancel, { borderColor: theme.border }]}
+                onPress={() => setDeleteAlert({ visible: false, orderId: null, orderStatus: null })}
+              >
+                <Text style={[styles.modalBtnCancelText, { color: theme.textPrimary }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalBtnDelete}
+                onPress={confirmDelete}
+              >
+                <Text style={styles.modalBtnDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -524,5 +561,74 @@ const styles = StyleSheet.create({
   flagReasonText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  modalBox: {
+    width: '100%',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  modalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalIcon: {
+    fontSize: 28,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  modalBtnCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  modalBtnDelete: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+  },
+  modalBtnDeleteText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

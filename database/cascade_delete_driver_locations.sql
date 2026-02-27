@@ -1,4 +1,4 @@
--- Add CASCADE DELETE to driver_locations table
+eas build --profile preview --platform android-- Add CASCADE DELETE to driver_locations table
 -- When an order is deleted, all associated driver_locations will be automatically deleted
 
 ALTER TABLE driver_locations

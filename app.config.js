@@ -4,11 +4,12 @@ export default {
     slug: "tracksure",
     version: "1.0.0",
     orientation: "portrait",
+    icon: "./assets/logo.png",
     userInterfaceStyle: "light",
     newArchEnabled: false,
     extra: {
       eas: {
-        projectId: "d54fae0b-6c5c-479a-92a6-e4d1b2d168ad"
+        projectId: "db5d27be-279d-4d60-9077-69ad8d733e95"
       }
     },
     ios: {
@@ -39,7 +40,8 @@ export default {
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "RECORD_AUDIO"
       ]
     },
     plugins: [
@@ -52,9 +54,11 @@ export default {
       [
         "expo-image-picker",
         {
-          photosPermission: "TrackSure needs access to your photos to capture delivery proof."
+          photosPermission: "TrackSure needs access to your photos to capture delivery proof.",
+          cameraPermission: "TrackSure needs camera access to capture delivery proof photos."
         }
-      ]
+      ],
+      "expo-asset"
     ]
   }
 };
